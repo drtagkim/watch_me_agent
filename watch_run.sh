@@ -80,3 +80,9 @@ fi
 # 8. Deactivate when done
 deactivate
 echo "✅ Virtual environment deactivated. Goodbye, Professor! 👋"
+
+# 9. Open output folder in Finder
+if [ -d "output" ]; then
+    echo "📂 output/ 폴더를 Finder에서 열겠습니다..."
+    open output/
+fi
