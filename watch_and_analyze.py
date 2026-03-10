@@ -225,13 +225,11 @@ def process_chunk(recording, frames, exact_timestamp, chunk_idx, fs=16000, log_f
         cumulative_transcripts.append(f"[{exact_timestamp}] {transcription}")
         cumulative_reports.append(f"### 국면 {chunk_idx} 분석 ({exact_timestamp})\n{report_text}\n")
         
-        # 3. 실시간 터미널 출력 및 마크다운 Append
+        # 3. 실시간 터미널 출력 (분석 보고서 본문은 생략, 파일 저장 안내만)
         print()
         print_styled(f"==== 💡 [Gemini 통섭 분석 완료] 국면 {chunk_idx} ====", Color.GREEN, Color.BOLD)
         print_styled(f"[STT 전사]: {transcription[:80]}...", Color.MAGENTA)
-        print_styled("-" * 40, Color.DIM)
-        print(report_text)
-        print_styled("=========================================", Color.DIM)
+        print_styled(f"📝 분석 내용은 실시간 로그 파일({log_file})에 저장되었습니다.", Color.DIM)
         print()
         
         with open(log_file, "a", encoding="utf-8") as f:
