@@ -63,14 +63,8 @@ def cleanup_hardware():
         finally:
             audio_stream = None
 
-    if cap is not None and cap.isOpened():
-        try:
-            cap.release()
-            print_success("카메라(비디오) 자원을 안전하게 반환했습니다.")
-        except Exception:
-            pass
-        finally:
-            cap = None
+    # 카메라(cap) 해제는 메인 스레드가 아닌 video_capture_loop 스레드에서 스스로 안전하게 처리하도록 위임
+    # Mac 환경에서 스레드 간 충돌로 인해 초록색(카메라 활성) 불이 꺼지지 않는 현상 방지.
 
 def cleanup_temp_dir():
     """temp 폴더 내의 모든 파일을 삭제합니다 (폴더 자체는 유지)."""
@@ -114,6 +108,11 @@ def video_capture_loop():
                 latest_frame = frame.copy()
         # 약 30fps 수준으로 지속적으로 버퍼를 비워주어야 자동 노출과 실시간성이 유지됨
         time.sleep(0.03)
+        
+    # 루프가 끝나면 스레드 자신이 직접 안전하게 카메라 자원 해제 (Mac 데드락 방지)
+    if cap is not None and cap.isOpened():
+        cap.release()
+        print_success("카메라(비디오) 자원을 백그라운드 스레드에서 안전하게 반환했습니다.")
 
 def handle_exit(signum=None, frame=None):
     """Ctrl+C 또는 강제 종료 시그널 처리"""
@@ -563,6 +562,11 @@ def main_loop(chunk_duration=30, focus_area=""):
                 generate_global_summary(session_id)
             # 종료 전 임시 파일 한번 더 비우기
             cleanup_temp_dir()
+            
+            # 카메라 백그라운드 스레드가 안전하게 자원을 반납할 수 있도록 잠시 대기
+            if 'v_thread' in locals():
+                v_thread.join(timeout=3.0)
+                
             print_styled("\n[완료] 윤이나의 관찰 및 분석이 모두 안전하게 종료되었습니다. 수고하셨습니다, 교수님!", Color.CYAN, Color.BOLD)
         except KeyboardInterrupt:
             print()
