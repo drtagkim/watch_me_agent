@@ -55,7 +55,7 @@ def cleanup_hardware():
     global audio_stream, cap
     if audio_stream is not None:
         try:
-            audio_stream.stop()
+            audio_stream.abort() # Deadlock 및 CoreAudio Crash 방지 위해 stop 대신 abort 사용
             audio_stream.close()
         except Exception:
             pass
@@ -113,9 +113,6 @@ def video_capture_loop():
                 latest_frame = frame.copy()
         # 약 30fps 수준으로 지속적으로 버퍼를 비워주어야 자동 노출과 실시간성이 유지됨
         time.sleep(0.03)
-        
-    if cap and cap.isOpened():
-        cap.release()
 
 def handle_exit(signum=None, frame=None):
     """Ctrl+C 또는 강제 종료 시그널 처리"""
@@ -123,7 +120,6 @@ def handle_exit(signum=None, frame=None):
     is_running = False
     print()
     print_warning("(종료 신호 감지: 현재 진행 중인 분석까지만 마치고 종료합니다)")
-    cleanup_hardware()
 
 def process_chunk(recording, frames, exact_timestamp, chunk_idx, fs=16000, log_file="", image_dir=""):
     audio_file = os.path.join(TEMP_DIR, f"temp_presentation_chunk_{chunk_idx}.wav")
@@ -520,12 +516,10 @@ def main_loop(chunk_duration=10, focus_area=None):
         print()
         print_warning("[Ctrl+C 감지] 사용자에 의해 강제 종료됩니다.")
     finally:
-        if is_running:
-            handle_exit()
-            
+        is_running = False # 루프가 끝났으므로 다른 스레드들에게도 확실히 종료 신호 전달
         print()
-        print_success("(종료 루틴 진입) 마이크와 카메라가 완전히 회수되었습니다.")
-        cleanup_hardware() # 2차 확인용 (handle_exit에서 이미 처리되지만 안전망)
+        print_success("(종료 루틴 진입) 마이크와 카메라 자원 회수 중...")
+        cleanup_hardware() 
         print_info("진행 중인 백그라운드 분석 중인 데이터(Gemini API 병합)가 있다면 완료될 때까지 잠시 대기합니다...")
         
         executor.shutdown(wait=True, cancel_futures=False)
