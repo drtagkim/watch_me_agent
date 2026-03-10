@@ -405,9 +405,16 @@ def CLI_wait_for_exit():
     except EOFError:
         pass
 
-def main_loop(chunk_duration=10, focus_area=None):
-    global is_running, audio_stream
+def main_loop(chunk_duration=30, focus_area=""):
+    """상시 관찰 메인 루프"""
+    global is_running
 
+    # 변수 초기화 (Scope 에러 방지용)
+    session_id = None
+    realtime_log_file = None
+    question_log_file = None
+    image_dir = None
+    
     # 시스템 시그널 등록 (Ctrl+C 등 강제종료 대비)
     signal.signal(signal.SIGINT, handle_exit)
     signal.signal(signal.SIGTERM, handle_exit)
@@ -481,13 +488,40 @@ def main_loop(chunk_duration=10, focus_area=None):
             last_frame_capture_time = time.time()
             
             # chunk_duration 만큼 대기하며 3초 단위 백그라운드 캡처 허용
+            spin_chars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+            spin_idx = 0
             while is_running and (time.time() - start_time) < chunk_duration:
-                if (time.time() - last_frame_capture_time) >= 3.0:
+                current_time = time.time()
+                # 3초마다 프레임 캡처 이벤트
+                if (current_time - last_frame_capture_time) >= 3.0:
                     with frame_lock:
                         if latest_frame is not None:
                             chunk_frames.append(latest_frame.copy())
-                    last_frame_capture_time = time.time()
+                    last_frame_capture_time = current_time
+                    sys.stdout.write(f"\r{style('📸 [찰칵! 화면 포착]', Color.YELLOW, Color.BOLD)} ({len(chunk_frames)} frames)".ljust(50))
+                    sys.stdout.flush()
+                    time.sleep(0.3) # 캡처 이모지 유지
+                
+                # 실제 마이크 볼륨 기반 동적 EQ 계산
+                volume = 0.0
+                with audio_buffer_lock:
+                    if len(audio_buffer) > 0:
+                        volume = np.max(np.abs(audio_buffer[-1]))
+                
+                # 시각화 (0~10칸)
+                bars = int(min(volume * 100, 10))
+                eq_str = "🟩" * bars + "⬛" * (10 - bars)
+                emoji = spin_chars[spin_idx % len(spin_chars)]
+                
+                sys.stdout.write(f"\r{style(f'🎙️ {emoji} 관찰 중... [{eq_str}]', Color.CYAN)}".ljust(60))
+                sys.stdout.flush()
+                
+                spin_idx += 1
                 time.sleep(0.1)
+                
+            # 루프 종료 시 화면 클리어
+            sys.stdout.write("\r" + " " * 60 + "\r")
+            sys.stdout.flush()
                 
             if not is_running:
                 break
@@ -526,15 +560,15 @@ def main_loop(chunk_duration=10, focus_area=None):
         
         try:
             executor.shutdown(wait=True, cancel_futures=False)
-            # 최종 결과 종합
-            generate_global_summary(session_id)
+            # 최종 결과 종합 (로컬 변수가 선언되어 있을 때만)
+            if session_id:
+                generate_global_summary(session_id)
             # 종료 전 임시 파일 한번 더 비우기
             cleanup_temp_dir()
             print_styled("\n[완료] 윤이나의 관찰 및 분석이 모두 안전하게 종료되었습니다. 수고하셨습니다, 교수님!", Color.CYAN, Color.BOLD)
         except KeyboardInterrupt:
             print()
             print_error("🚨 강제 종료 신호 재입력 감지! 즉시 모든 프로세스를 처형하고 시스템을 탈출합니다.")
-            import os
             os._exit(1)
 
 if __name__ == "__main__":
