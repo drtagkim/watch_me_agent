@@ -52,21 +52,24 @@ def get_macbook_mic_index():
 
 def cleanup_hardware():
     """모든 하드웨어 리소스를 즉시 반환합니다."""
-    global audio_stream
+    global audio_stream, cap
     if audio_stream is not None:
         try:
             audio_stream.stop()
             audio_stream.close()
         except Exception:
             pass
-            
-    global cap
+        finally:
+            audio_stream = None
+
     if cap is not None and cap.isOpened():
         try:
             cap.release()
             print_success("카메라(비디오) 자원을 안전하게 반환했습니다.")
         except Exception:
             pass
+        finally:
+            cap = None
 
 def cleanup_temp_dir():
     """temp 폴더 내의 모든 파일을 삭제합니다 (폴더 자체는 유지)."""
@@ -457,6 +460,7 @@ def main_loop(chunk_duration=10, focus_area=None):
     v_thread.start()
     
     # 2. Audio 백그라운드 콜백 캡처 시작
+    global audio_stream
     audio_stream = sd.InputStream(samplerate=fs, channels=1, dtype='float32', device=mic_idx, callback=audio_callback)
     audio_stream.start()
     
