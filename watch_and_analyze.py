@@ -14,6 +14,16 @@ import signal
 from concurrent.futures import ThreadPoolExecutor
 from PIL import Image
 
+# antigravity_ui 경로 추가
+antigravity_ui_path = os.path.abspath("/Users/tagg/Library/CloudStorage/GoogleDrive-masan.korea@gmail.com/내 드라이브/Development/2026-02-10(Antigravity-coding-knowledge)")
+if antigravity_ui_path not in sys.path:
+    sys.path.append(antigravity_ui_path)
+
+from antigravity_ui import (
+    Spinner, print_success, print_error, print_warning, print_info,
+    Color, style, print_styled
+)
+
 # 전역 상태 변수
 is_running = True
 cumulative_transcripts = []
@@ -37,7 +47,7 @@ def get_macbook_mic_index():
         name = dev['name']
         if ('MacBook' in name or 'Built-in' in name) and dev['max_input_channels'] > 0:
             return i
-    print("Warning: 'MacBook' mic not found. Using default input.")
+    print_warning("'MacBook' mic not found. Using default input.")
     return sd.default.device[0]
 
 def cleanup_hardware():
@@ -54,7 +64,7 @@ def cleanup_hardware():
     if cap is not None and cap.isOpened():
         try:
             cap.release()
-            print("📷 카메라(비디오) 자원을 안전하게 반환했습니다.")
+            print_success("카메라(비디오) 자원을 안전하게 반환했습니다.")
         except Exception:
             pass
 
@@ -67,8 +77,8 @@ def cleanup_temp_dir():
             if os.path.isfile(file_path):
                 os.remove(file_path)
         except Exception as e:
-            print(f"🧹 임시 파일 삭제 실패 ({file_path}): {e}")
-    print(f"🧹 임시 폴더({TEMP_DIR}/) 정리를 완료했습니다.")
+            print_error(f"임시 파일 삭제 실패 ({file_path}): {e}")
+    print_success(f"임시 폴더({TEMP_DIR}/) 정리를 완료했습니다.")
 
 def audio_callback(indata, frames, time_info, status):
     """지속적으로 불리는 오디오 콜백"""
@@ -82,7 +92,7 @@ def video_capture_loop():
     
     cap = cv2.VideoCapture(0, cv2.CAP_AVFOUNDATION)
     if not cap.isOpened():
-        print("Warning: 웹캠을 초기화할 수 없습니다.")
+        print_error("웹캠을 초기화할 수 없습니다.")
         return
         
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
@@ -108,7 +118,8 @@ def handle_exit(signum=None, frame=None):
     """Ctrl+C 또는 강제 종료 시그널 처리"""
     global is_running
     is_running = False
-    print("\n\n(종료 신호 감지: 현재 진행 중인 분석까지만 마치고 종료합니다)")
+    print()
+    print_warning("(종료 신호 감지: 현재 진행 중인 분석까지만 마치고 종료합니다)")
     cleanup_hardware()
 
 def process_chunk(recording, frames, exact_timestamp, chunk_idx, fs=16000, log_file="", image_dir=""):
@@ -134,11 +145,13 @@ def process_chunk(recording, frames, exact_timestamp, chunk_idx, fs=16000, log_f
     # Python 기반 무음 필터링 (완전 정적인 앰비언트 노이즈 이하는 버림)
     max_amp = np.max(np.abs(recording))
     if max_amp < 0.005:  # 마이크에 소리가 안 들어오는 수준의 float32 threshold
-        print(f"\n[{exact_timestamp}] 🛑 [분석 스레드] 국면 {chunk_idx}: 유의미한 소리 미감지 (max_amp={max_amp:.4f}). 생략.")
+        print()
+        print_info(f"[{exact_timestamp}] [분석 스레드] 국면 {chunk_idx}: 유의미한 소리 미감지 (max_amp={max_amp:.4f}). 생략.")
         if os.path.exists(audio_file): os.remove(audio_file)
         return
         
-    print(f"\n[{exact_timestamp}] 🧠 [분석 스레드] 국면 {chunk_idx}: Gemini 3.1 Pro Preview로 오디오와 영상 원본 동시 전송 중...")
+    print()
+    print_info(style(f"[{exact_timestamp}] [분석 스레드] 국면 {chunk_idx}: Gemini 3.1 Pro Preview로 오디오와 영상 원본 동시 전송 중...", Color.CYAN))
     
     try:
         # 영상 해상도 축소 및 API 연동 (Gemini        # API Key 가져오기 (환경변수 의존)
@@ -205,18 +218,21 @@ def process_chunk(recording, frames, exact_timestamp, chunk_idx, fs=16000, log_f
 
         # 전사 내용 중에 진짜 [무음]만 있다면 스킵 처리
         if transcription in ["[무음]", "무음"]:
-             print(f"\n[{exact_timestamp}] 🛑 [분석 스레드] 국면 {chunk_idx}: 오디오가 잡음/무음 판별되어 통섭 무시됨.")
+             print()
+             print_warning(f"[{exact_timestamp}] [분석 스레드] 국면 {chunk_idx}: 오디오가 잡음/무음 판별되어 통섭 무시됨.")
              return
              
         cumulative_transcripts.append(f"[{exact_timestamp}] {transcription}")
         cumulative_reports.append(f"### 국면 {chunk_idx} 분석 ({exact_timestamp})\n{report_text}\n")
         
         # 3. 실시간 터미널 출력 및 마크다운 Append
-        print(f"\n\n==== 💡 [Gemini 통섭 분석 완료] 국면 {chunk_idx} ====")
-        print(f"[STT 전사]: {transcription[:80]}...")
-        print("-" * 40)
+        print()
+        print_styled(f"==== 💡 [Gemini 통섭 분석 완료] 국면 {chunk_idx} ====", Color.GREEN, Color.BOLD)
+        print_styled(f"[STT 전사]: {transcription[:80]}...", Color.MAGENTA)
+        print_styled("-" * 40, Color.DIM)
         print(report_text)
-        print("=========================================\n")
+        print_styled("=========================================", Color.DIM)
+        print()
         
         with open(log_file, "a", encoding="utf-8") as f:
             f.write(f"\n## 국면 {chunk_idx} ({exact_timestamp})\n")
@@ -235,16 +251,19 @@ def process_chunk(recording, frames, exact_timestamp, chunk_idx, fs=16000, log_f
             qf.write("---\n")
             
     except Exception as e:
-         print(f"❌ 분석 처리 중 오류 발생: {e}")
+         print_error(f"분석 처리 중 오류 발생: {e}")
 
 def generate_global_summary(session_id):
     if not cumulative_transcripts and not cumulative_reports:
-        print("\n수집된 데이터가 없어 총괄 요약을 생략합니다.")
+        print()
+        print_info("수집된 데이터가 없어 총괄 요약을 생략합니다.")
         return
         
-    print("\n" + "*"*60)
-    print("✨ [윤이나의 발표 총괄 최종 종합 분석 중...]")
-    print("*"*60)
+    print()
+    print_styled("*"*60, Color.YELLOW, Color.BOLD)
+    print_styled("✨ [윤이나의 발표 총괄 최종 종합 분석 중...]", Color.YELLOW, Color.BOLD)
+    print_styled("*"*60, Color.YELLOW, Color.BOLD)
+    print()
     
     all_transcripts = "\n".join(cumulative_transcripts)
     
@@ -289,7 +308,8 @@ def generate_global_summary(session_id):
                 sys.stdout.write(chunk.text)
                 sys.stdout.flush()
                 
-        print("\n" + "*"*60)
+        print()
+        print_styled("*"*60, Color.YELLOW, Color.BOLD)
         
         dynamic_title = "🎓 윤이나의 종합 심층 분석 리포트"
         if "<TITLE>" in final_summary and "</TITLE>" in final_summary:
@@ -320,11 +340,12 @@ def generate_global_summary(session_id):
         update_log_title(realtime_log_file, dynamic_title)
         update_log_title(question_log_file, f"🤔 [Q&A] {dynamic_title}")
             
-        print(f"\n💾 최종 총괄 리포트가 안전하게 저장되었습니다: {os.path.abspath(final_filename)}")
-        print(f"🔄 이전 실시간 로그 파일들의 제목도 분석 내용에 맞게 최종 갱신되었습니다.")
+        print()
+        print_success(f"최종 총괄 리포트가 안전하게 저장되었습니다: {os.path.abspath(final_filename)}")
+        print_success(f"이전 실시간 로그 파일들의 제목도 분석 내용에 맞게 최종 갱신되었습니다.")
         
     except Exception as e:
-        print(f"❌ 총괄 요약 생성 중 오류 발생: {e}")
+        print_error(f"총괄 요약 생성 중 오류 발생: {e}")
 
 def generate_dynamic_prompt(focus_area):
     global GLOBAL_DYNAMIC_PROMPT
@@ -333,12 +354,13 @@ def generate_dynamic_prompt(focus_area):
     base_default_prompt = "1. 📝 기록 (Record): 핵심 논의 팩트 체크 및 수치/방법론 식별\n2. 📌 분석 (Analysis): 논리 전개 흐름 및 문맥적 가치 심층 분석\n3. ⚖️ 평가 (Evaluation): 주장의 타당성 진단 및 날카로운 보완점 도출"
     
     if not gemini_key:
-        print("⚠️ GEMINI_API_KEY가 없어 기본 분석 지침을 사용합니다.")
+        print_warning("GEMINI_API_KEY가 없어 기본 분석 지침을 사용합니다.")
         GLOBAL_DYNAMIC_PROMPT = base_default_prompt
         return
         
     focus_text = focus_area if focus_area else "일반 학술 논문 및 연구 발표 심사"
-    print(f"\n🧠 [Gemini 3.1 Pro Preview] 사용자의 집중 분석 목표('{focus_text}')를 반영하여 고도화된 맞춤형 지침을 동적 생성 중...")
+    print()
+    print_info(style(f"🧠 [Gemini 3.1 Pro Preview] 사용자의 집중 분석 목표('{focus_text}')를 반영하여 고도화된 맞춤형 지침을 동적 생성 중...", Color.CYAN))
     try:
         gemini_client = genai.Client(api_key=gemini_key)
         
@@ -366,9 +388,9 @@ def generate_dynamic_prompt(focus_area):
             contents=system_instructions
         )
         GLOBAL_DYNAMIC_PROMPT = response.text.strip()
-        print(f"✅ 동적 분석 지침 생성 완료:\n{GLOBAL_DYNAMIC_PROMPT}\n")
+        print_success(f"동적 분석 지침 생성 완료:\n{style(GLOBAL_DYNAMIC_PROMPT, Color.DIM)}")
     except Exception as e:
-        print(f"⚠️ Gemini 동적 프롬프트 생성 실패 ({e}). 기본 지침 사용.")
+        print_warning(f"Gemini 동적 프롬프트 생성 실패 ({e}). 기본 지침 사용.")
         GLOBAL_DYNAMIC_PROMPT = base_default_prompt
 
 def CLI_wait_for_exit():
@@ -377,7 +399,8 @@ def CLI_wait_for_exit():
     try:
         input()  
         if is_running: # Enter를 쳐서 종료할경우
-            print("\n\n(Enter 키 입력 감지: 기록을 중단합니다)")
+            print()
+            print_warning("(Enter 키 입력 감지: 기록을 중단합니다)")
             handle_exit()
     except EOFError:
         pass
@@ -417,14 +440,17 @@ def main_loop(chunk_duration=10, focus_area=None):
         qf.write(f"> **시작 시각:** {session_id.replace('_', ' ')}\n")
         qf.write("---\n")
     
-    print("\n" + "="*70)
-    print(f"🎙️ [Yoon Ina's Academic Watch] - 연속 스트리밍 모드 CLI")
-    print("="*70)
-    print(f"✔️ 입력 장치: {device_name} (Index: {mic_idx})")
-    print(f"✔️ 분석 간격: {chunk_duration}초 (1개 국면당)")
-    print(f"✔️ 실시간 로그 파일: {os.path.abspath(realtime_log_file)}")
-    print(f"🚨 중요: 실행 중 [Enter] 키 또는 [Ctrl+C]를 누르면 즉각 기록을 멈추고 하드웨어를 회수합니다.")
-    print("\n▶️ 하드웨어 연속 캡처 및 분석을 시작합니다...\n")
+    print()
+    print_styled("="*70, Color.BLUE, Color.BOLD)
+    print_styled("🎙️ [Yoon Ina's Academic Watch] - 연속 스트리밍 모드 CLI", Color.BLUE, Color.BOLD)
+    print_styled("="*70, Color.BLUE, Color.BOLD)
+    print(style("✔️ 입력 장치: ", Color.GREEN) + f"{device_name} (Index: {mic_idx})")
+    print(style("✔️ 분석 간격: ", Color.GREEN) + f"{chunk_duration}초 (1개 국면당)")
+    print(style("✔️ 실시간 로그 파일: ", Color.GREEN) + f"{os.path.abspath(realtime_log_file)}")
+    print(style("🚨 단축키 안내: ", Color.RED, Color.BOLD) + "실행 중 " + style("[Enter]", Color.WHITE, Color.BOLD) + " 키 또는 " + style("[Ctrl+C]", Color.WHITE, Color.BOLD) + "를 누르면 즉각 기록을 멈추고 안전하게 요약본을 생성한 뒤 하드웨어를 회수합니다.")
+    print()
+    print_styled("▶️ 하드웨어 연속 캡처 및 분석을 시작합니다...", Color.CYAN, Color.BOLD)
+    print()
     
     # 1. Video 백그라운드 캡처 시작
     v_thread = threading.Thread(target=video_capture_loop, daemon=True)
@@ -466,7 +492,8 @@ def main_loop(chunk_duration=10, focus_area=None):
                 break
                 
             exact_timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print(f"\n▶️ [{exact_timestamp}] [메인 루프] 국면 {chunk_idx}: {chunk_duration}초 분량 컷팅 및 백그라운드 스레드 전달...", flush=True)
+            print()
+            print_styled(f"▶️ [{exact_timestamp}] [메인 루프] 국면 {chunk_idx}: {chunk_duration}초 분량 컷팅 및 백그라운드 스레드 전달...", Color.MAGENTA)
             
             # 음성 버퍼에서 10초 분량 가져오고 버퍼 비우기
             with audio_buffer_lock:
@@ -486,14 +513,16 @@ def main_loop(chunk_duration=10, focus_area=None):
             chunk_idx += 1
             
     except KeyboardInterrupt:
-        print("\n[Ctrl+C 감지] 사용자에 의해 강제 종료됩니다.")
+        print()
+        print_warning("[Ctrl+C 감지] 사용자에 의해 강제 종료됩니다.")
     finally:
         if is_running:
             handle_exit()
             
-        print("\n\n⏹️ (종료 루틴 진입) 마이크와 카메라가 완전히 회수되었습니다.")
+        print()
+        print_success("(종료 루틴 진입) 마이크와 카메라가 완전히 회수되었습니다.")
         cleanup_hardware() # 2차 확인용 (handle_exit에서 이미 처리되지만 안전망)
-        print("   진행 중인 백그라운드 분석 중인 데이터(Gemini API 병합)가 있다면 완료될 때까지 잠시 대기합니다...")
+        print_info("진행 중인 백그라운드 분석 중인 데이터(Gemini API 병합)가 있다면 완료될 때까지 잠시 대기합니다...")
         
         executor.shutdown(wait=True, cancel_futures=False)
         
@@ -502,7 +531,8 @@ def main_loop(chunk_duration=10, focus_area=None):
         
         # 최종 결과 종합
         generate_global_summary(session_id)
-        print("\n👋 모든 과정이 완전히 종료되었습니다. 수고하셨습니다 교수님!")
+        print()
+        print_styled("👋 모든 과정이 완전히 종료되었습니다. 수고하셨습니다 교수님!", Color.GREEN, Color.BOLD)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Watch Presentation CLI Tool (Yoon Ina)")

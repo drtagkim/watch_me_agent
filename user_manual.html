@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yoon Ina's Academic Watch - 사용 설명서</title>
+    <style>
+        :root {
+            --primary-color: #4A90E2;
+            --secondary-color: #F5A623;
+            --background-color: #F8F9FA;
+            --text-color: #333;
+            --card-bg: #FFFFFF;
+        }
+
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            color: var(--primary-color);
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        h2 {
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 10px;
+            margin-top: 40px;
+        }
+
+        h3 {
+            color: #555;
+            margin-top: 25px;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 25px;
+            margin-bottom: 25px;
+        }
+
+        .code-block {
+            background-color: #2D2D2D;
+            color: #F8F8F2;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+
+        .highlight {
+            color: var(--secondary-color);
+            font-weight: bold;
+        }
+
+        ul {
+            padding-left: 20px;
+        }
+
+        li {
+            margin-bottom: 10px;
+        }
+
+        .note {
+            background-color: #E3F2FD;
+            border-left: 4px solid var(--primary-color);
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 4px 4px 0;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            color: #777;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>🎙️ Yoon Ina's Academic Watch</h1>
+            <p><strong>실시간 학술대회 / 회의 분석 AI 어시스턴트 사용 설명서</strong></p>
+        </header>
+
+        <div class="card">
+            <h2>🛠️ 설치 및 설정 (Installation)</h2>
+            <p>프로그램을 처음 사용하기 위한 필수 설정 과정입니다.</p>
+            <ol>
+                <li>터미널(Terminal)을 열고 구동할 폴더로 이동합니다.<br>
+                    <div class="code-block">cd /Users/tagg/dev/WatchPresentation</div>
+                </li>
+                <li>파이썬 가상환경(venv)을 생성하고 활성화합니다.<br>
+                    <div class="code-block">python3 -m venv venv<br>source venv/bin/activate</div>
+                </li>
+                <li>필요한 파이썬 패키지를 설치합니다.<br>
+                    <div class="code-block">pip install -r requirements.txt</div>
+                </li>
+                <li><code>.env</code> 파일을 생성하고 발급받은 <strong>GEMINI_API_KEY</strong>를 입력합니다.<br>
+                    <div class="code-block">echo "GEMINI_API_KEY=your_key_here" > .env</div>
+                </li>
+            </ol>
+        </div>
+
+        <div class="card">
+            <h2>🚀 빠른 시작 (Quick Start - 권장)</h2>
+            <p>프로그램을 실행하는 가장 간단하고 권장되는 방법입니다.</p>
+            <ol>
+                <li>터미널(Terminal)을 엽니다.</li>
+                <li>프로젝트 폴더로 이동합니다.<br>
+                    <div class="code-block">cd /Users/tagg/dev/WatchPresentation</div>
+                </li>
+                <li>실행 스크립트를 구동합니다.<br>
+                    <div class="code-block">./watch_run.sh</div>
+                </li>
+            </ol>
+            <div class="note">
+                <strong>참고:</strong> 최초 실행 시 <code>llama.cpp</code> (Qwen3-VL-8B 모델) 서버가 <strong>반드시</strong>
+                127.0.0.1:8080 포트에서 실행 중이어야 합니다.
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>⚙️ 실행 시 설정 항목 (대화형)</h2>
+            <p><code>./watch_run.sh</code> 실행 시, 조교(Yoon Ina)가 두 가지 질문을 드립니다.</p>
+
+            <h3>1. 분석 주기 (Chunk Duration) 설정</h3>
+            <div class="code-block">⏱️ 분석 주기를 몇 초 단위로 설정하시겠습니까? (기본값: 30):</div>
+            <ul>
+                <li><strong>의미:</strong> 몇 초마다 끊어서 음성과 화면을 AI(Qwen)에게 분석 맡길지 결정합니다.</li>
+                <li><strong>입력 예시:</strong> <code>15</code>, <code>60</code>, <code>120</code> 등 숫자로 입력 후 엔터.</li>
+                <li><strong>기본값:</strong> 그냥 엔터를 치면 무난한 <strong>30초</strong> 단위로 자동 설정됩니다.</li>
+                <li><span class="highlight">Tip:</span> 호흡이 긴 강연은 60초 이상, 즉각적인 반응이 필요한 회의는 15~30초를 추천합니다.</li>
+            </ul>
+
+            <h3>2. 동적 맞춤 분석 (Focus Area) 설정</h3>
+            <div class="code-block">🎯 이번 발표/회의에서 특별히 집중 분석할 키워드나 관점이 있나요? (엔터 입력 시 기본 모드):</div>
+            <ul>
+                <li><strong>의미:</strong> AI가 "무엇을 집중적으로 볼지" 목표를 부여합니다. Gemini 모델이 이를 해석하여 Qwen에게 맞춤형 지시를 내립니다.</li>
+                <li><strong>입력 예시:</strong> <code>연구 방법의 한계점 찾기</code>, <code>인공지능 윤리적 쟁점</code>, <code>경쟁사와의 차별점</code>
+                </li>
+                <li><strong>기본값:</strong> 그냥 엔터를 치면 <strong>기본 학술/연구 발표 심사 모드</strong>(기록/요약/평가)로 작동합니다.</li>
+            </ul>
+        </div>
+
+        <div class="card">
+            <h2>💻 파이썬 직접 실행 모드 (Advanced)</h2>
+            <p>쉘 스크립트(<code>watch_run.sh</code>)를 거치지 않고 직접 세부 옵션을 설정하고 싶을 때 사용합니다.</p>
+            <ul>
+                <li><strong>기본 실행:</strong> (30초 단위 분석, 기본 학술 모드)<br>
+                    <div class="code-block">python watch_and_analyze.py</div>
+                </li>
+                <li><strong>분석 주기 시간 변경 (<code>--chunk</code>):</strong> (예: 60초 단위)<br>
+                    <div class="code-block">python watch_and_analyze.py --chunk 60</div>
+                </li>
+                <li><strong>집중 분석 키워드 지정 (<code>--focus</code>):</strong><br>
+                    <div class="code-block">python watch_and_analyze.py --chunk 60 --focus "경쟁사와의 차별점 분석"</div>
+                </li>
+            </ul>
+        </div>
+
+        <div class="card">
+            <h2>📂 생성되는 결과물 (Outputs)</h2>
+            <p>분석이 시작되면 실시간으로 다음 파일들이 생성됩니다.</p>
+            <ul>
+                <li><strong>실시간 마크다운 로그 (Realtime_Log_*.md):</strong> 매 국면마다 텍스트 변환(STT), 웹캠 스냅샷, Gemini의 영/한 질문, Qwen의
+                    심층 분석 내용이 실시간 누적 기록됩니다.</li>
+                <li><strong>질문 모음 (Realtime_Log_*_question.md):</strong> 세션 중 파생된 핵심 질문(Micro/Macro)들만 따로 모아둔 파일입니다.
+                    회의/발표 끝난 직후 Q&A 시간에 바로 활용하세요.</li>
+                <li><strong>최종 총괄 리포트 (Final_Summary_*.md):</strong> (작업 종료 시) 전체 발표 과정을 요약, 평가한 최종 결론 보고서입니다.</li>
+                <li><strong>순정 이미지 보관 폴더 (Raw_Images_*/):</strong> 매 분석 국면마다 캡처된 원본 웹캠 스냅샷 파일(.jpg)들이 안전하게 저장됩니다.</li>
+            </ul>
+        </div>
+
+        <div class="card">
+            <h2>🛑 종료 명령 및 자원 정리</h2>
+            <p>분석을 마치고 싶으실 때는 터미널 창에서 <code>Ctrl + C</code> 키를 누르세요.</p>
+            <ul>
+                <li>실시간 진행 중이던 마지막 분석 루틴까지만 마치고 <strong>안전하게 종료</strong>됩니다.</li>
+                <li>마이크 및 카메라 하드웨어 점유율을 완벽히 반환합니다.</li>
+                <li>실행 중 쌓였던 임시 음성 데이터(<code>temp/</code> 폴더 내부 파일들)를 깨끗하게 청소합니다.</li>
+                <li>지금까지의 누적 기록을 바탕으로 <strong>[최종 총괄 리포트]</strong>를 작성하고 작별을 고합니다.</li>
+            </ul>
+        </div>
+
+        <div class="card">
+            <h2>🔑 필수 사전 요구 사항 (Requirements)</h2>
+            <ul>
+                <li><code>.env</code> 파일 내에 <code>GEMINI_API_KEY</code>가 등록되어 있어야 질문 생성 및 번역 기능이 작동합니다.</li>
+                <li>MacBook의 내장 마이크 및 카메라(또는 웹캠) 접근 권한이 터미널에 허용되어 있어야 합니다.</li>
+            </ul>
+        </div>
+
+        <footer>
+            <p>Powered by Yoon Ina (Research Assistant) &copy; 2026. Designed exclusively for Professor Tae-kyung Kim.
+            </p>
+        </footer>
+    </div>
+</body>
+
+</html>
