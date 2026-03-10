@@ -34,8 +34,24 @@ if [ -z "$GEMINI_API_KEY" ]; then
     sleep 2
 fi
 
-# 5. Interactive prompt for chunk duration
-DEFAULT_DURATION=30
+# 5. Read default chunk duration from preferences.yaml
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PREFS_FILE="$SCRIPT_DIR/preferences.yaml"
+
+if [ -f "$PREFS_FILE" ]; then
+    YAML_DURATION=$(grep 'duration_seconds' "$PREFS_FILE" | head -1 | awk -F'#' '{print $1}' | sed 's/[^0-9]//g')
+    if [ -n "$YAML_DURATION" ]; then
+        DEFAULT_DURATION=$YAML_DURATION
+        echo "✅ preferences.yaml에서 기본 국면 간격을 읽었습니다: ${DEFAULT_DURATION}초"
+    else
+        DEFAULT_DURATION=30
+        echo "⚠️  preferences.yaml 파싱 실패. 기본값 30초를 사용합니다."
+    fi
+else
+    DEFAULT_DURATION=30
+    echo "⚠️  preferences.yaml 파일이 없습니다. 기본값 30초를 사용합니다."
+fi
+
 echo -n "⏱️  분석 주기를 몇 초 단위로 설정하시겠습니까? (기본값: $DEFAULT_DURATION): "
 read USER_INPUT
 
