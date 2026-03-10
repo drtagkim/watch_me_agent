@@ -11,6 +11,7 @@ import threading
 import datetime
 import os
 import signal
+import yaml
 from concurrent.futures import ThreadPoolExecutor
 from PIL import Image
 
@@ -29,7 +30,35 @@ is_running = True
 cumulative_transcripts = []
 cumulative_reports = []
 GLOBAL_DYNAMIC_PROMPT = ""
-TEMP_DIR = "temp"
+
+# ── Preferences (YAML) ──────────────────────────────────────
+def load_preferences():
+    """preferences.yaml에서 설정을 로드합니다. 파일이 없으면 기본값을 사용합니다."""
+    default = {
+        "chunk": {"duration_seconds": 30, "focus_area": ""},
+        "capture": {"frame_interval_seconds": 3, "image_width": 472, "image_height": 354, "jpeg_quality": 60},
+        "audio": {"sample_rate": 16000},
+        "model": {"name": "gemini-3.1-pro-preview"},
+        "camera": {"width": 640, "height": 480, "warmup_frames": 10, "fps_sleep": 0.03},
+        "system": {"temp_dir": "temp", "thread_workers": 3},
+    }
+    yaml_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "preferences.yaml")
+    if os.path.exists(yaml_path):
+        try:
+            with open(yaml_path, "r", encoding="utf-8") as f:
+                user_prefs = yaml.safe_load(f) or {}
+            # 깊은 병합: 사용자 YAML → 기본값 위에 덮어쓰기
+            for section, values in user_prefs.items():
+                if section in default and isinstance(values, dict):
+                    default[section].update(values)
+                else:
+                    default[section] = values
+        except Exception as e:
+            print(f"⚠️  preferences.yaml 로드 실패 (기본값 사용): {e}")
+    return default
+
+PREFS = load_preferences()
+TEMP_DIR = PREFS["system"]["temp_dir"]
 
 # 하드웨어 스트림 자원
 cap = None
@@ -93,11 +122,11 @@ def video_capture_loop():
         print_error("웹캠을 초기화할 수 없습니다.")
         return
         
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, PREFS["camera"]["width"])
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, PREFS["camera"]["height"])
     
     # 워밍업: 카메라 켜진 직후의 어두운 프레임들을 소진시켜 자동 노출 맞출 시간 벌기
-    for _ in range(10):
+    for _ in range(PREFS["camera"]["warmup_frames"]):
         cap.read()
         time.sleep(0.1)
 
@@ -107,7 +136,7 @@ def video_capture_loop():
             with frame_lock:
                 latest_frame = frame.copy()
         # 약 30fps 수준으로 지속적으로 버퍼를 비워주어야 자동 노출과 실시간성이 유지됨
-        time.sleep(0.03)
+        time.sleep(PREFS["camera"]["fps_sleep"])
         
     # 루프가 끝나면 스레드 자신이 직접 안전하게 카메라 자원 해제 (Mac 데드락 방지)
     if cap is not None and cap.isOpened():
@@ -133,7 +162,7 @@ def process_chunk(recording, frames, exact_timestamp, chunk_idx, fs=16000, log_f
         
         pil_images = [Image.fromarray(cv2.cvtColor(f, cv2.COLOR_BGR2RGB)) for f in frames]
         # duration=3000ms (3초마다 전환)
-        pil_images[0].save(frame_path, save_all=True, append_images=pil_images[1:], duration=3000, loop=0)
+        pil_images[0].save(frame_path, save_all=True, append_images=pil_images[1:], duration=int(PREFS["capture"]["frame_interval_seconds"] * 1000), loop=0)
     
     if os.path.exists(audio_file):
         with open(audio_file, "rb") as af:
@@ -190,15 +219,15 @@ def process_chunk(recording, frames, exact_timestamp, chunk_idx, fs=16000, log_f
         # 여러 장의 이미지를 순차적으로 Part로 변환
         api_parts = [unified_prompt]
         for f in frames:
-            resized_frame = cv2.resize(f, (472, 354)) # 해상도 최적화 (가로 472, 세로 354로 4:3 비율 유지)
-            encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 60]
+            resized_frame = cv2.resize(f, (PREFS["capture"]["image_width"], PREFS["capture"]["image_height"]))
+            encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), PREFS["capture"]["jpeg_quality"]]
             _, buffer = cv2.imencode('.jpg', resized_frame, encode_param)
             api_parts.append(genai.types.Part.from_bytes(data=buffer.tobytes(), mime_type="image/jpeg"))
             
         api_parts.append(genai.types.Part.from_bytes(data=audio_bytes, mime_type="audio/wav"))
         
         response = gemini_client.models.generate_content(
-            model="gemini-3.1-pro-preview",
+            model=PREFS["model"]["name"],
             contents=api_parts
         )
         unified_result = response.text
@@ -294,7 +323,7 @@ def generate_global_summary(session_id):
     
     try:
         response = gemini_client.models.generate_content_stream(
-            model="gemini-3.1-pro-preview",
+            model=PREFS["model"]["name"],
             contents=prompt,
         )
         
@@ -381,7 +410,7 @@ def generate_dynamic_prompt(focus_area):
 불필요한 서론/결론이나 인사말 없이 오직 **1, 2, 3번 지시문 본문만 깔끔한 마크다운 형태**로 출력하세요.
         """
         response = gemini_client.models.generate_content(
-            model="gemini-3.1-pro-preview",
+            model=PREFS["model"]["name"],
             contents=system_instructions
         )
         GLOBAL_DYNAMIC_PROMPT = response.text.strip()
@@ -422,7 +451,7 @@ def main_loop(chunk_duration=30, focus_area=""):
     # 0.5 임시 폴더 초기화
     cleanup_temp_dir()
 
-    fs = 16000
+    fs = PREFS["audio"]["sample_rate"]
     mic_idx = get_macbook_mic_index()
     device_name = sd.query_devices(mic_idx)['name']
     
@@ -472,7 +501,7 @@ def main_loop(chunk_duration=30, focus_area=""):
     chunk_idx = 1
     cumulative_audio_data = []
     # STT와 LLM 병렬 안전처리 위해 2개~4개 할당 (M3 스레드 효율)
-    executor = ThreadPoolExecutor(max_workers=3, thread_name_prefix="WatchWorker")
+    executor = ThreadPoolExecutor(max_workers=PREFS["system"]["thread_workers"], thread_name_prefix="WatchWorker")
     try:
         while is_running:
             start_time = time.time()
@@ -490,7 +519,7 @@ def main_loop(chunk_duration=30, focus_area=""):
             while is_running and (time.time() - start_time) < chunk_duration:
                 current_time = time.time()
                 # 3초마다 프레임 캡처 이벤트
-                if (current_time - last_frame_capture_time) >= 3.0:
+                if (current_time - last_frame_capture_time) >= PREFS["capture"]["frame_interval_seconds"]:
                     with frame_lock:
                         if latest_frame is not None:
                             chunk_frames.append(latest_frame.copy())
@@ -575,8 +604,11 @@ def main_loop(chunk_duration=30, focus_area=""):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Watch Presentation CLI Tool (Yoon Ina)")
-    parser.add_argument("--chunk", type=int, default=10, help="Chunk duration in seconds (기본값: 10초)")
-    parser.add_argument("--focus", type=str, default="", help="집중 분석할 키워드 또는 관점")
+    parser.add_argument("--chunk", type=int, default=None, help="Chunk duration in seconds (미지정 시 preferences.yaml 기본값 사용)")
+    parser.add_argument("--focus", type=str, default=None, help="집중 분석할 키워드 또는 관점")
     args = parser.parse_args()
     
-    main_loop(chunk_duration=args.chunk, focus_area=args.focus)
+    chunk_val = args.chunk if args.chunk is not None else PREFS["chunk"]["duration_seconds"]
+    focus_val = args.focus if args.focus is not None else PREFS["chunk"]["focus_area"]
+    
+    main_loop(chunk_duration=chunk_val, focus_area=focus_val)
