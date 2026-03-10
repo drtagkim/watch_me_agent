@@ -7,6 +7,7 @@ venv/
 .env
 
 # Raw Media & Logs
+output/
 Raw_Images_*/
 Realtime_Log_*.md
 Final_Summary_*.md

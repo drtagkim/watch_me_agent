@@ -343,15 +343,18 @@ def generate_global_summary(session_id):
             final_summary = final_summary.replace(f"<TITLE>{dynamic_title}</TITLE>", "").strip()
             final_summary = final_summary.replace("<TITLE>", "").replace("</TITLE>", "").strip()
             
-        final_filename = f"Final_Summary_{session_id}.md"
+        output_dir = "output"
+        final_filename = os.path.join(output_dir, f"Final_Summary_{session_id}.md")
+        # Final_Summary는 output/ 바로 아래에 저장 (세션 폴더 상위)
         with open(final_filename, "w", encoding="utf-8") as f:
             f.write(f"# {dynamic_title}\n")
             f.write(f"> **Session ID:** `{session_id}`\n\n")
             f.write(final_summary)
             
         # 실시간 로그와 질문 로그 파일의 제목도 새로 지어진 멋진 제목으로 업데이트
-        realtime_log_file = f"Realtime_Log_{session_id}.md"
-        question_log_file = realtime_log_file.replace(".md", "_question.md")
+        session_dir = os.path.join(output_dir, session_id)
+        realtime_log_file = os.path.join(session_dir, f"Realtime_Log_{session_id}.md")
+        question_log_file = os.path.join(session_dir, f"Realtime_Log_{session_id}_question.md")
         
         def update_log_title(filepath, new_title):
             if os.path.exists(filepath):
@@ -456,9 +459,23 @@ def main_loop(chunk_duration=30, focus_area=""):
     device_name = sd.query_devices(mic_idx)['name']
     
     session_id = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    realtime_log_file = f"Realtime_Log_{session_id}.md"
-    question_log_file = realtime_log_file.replace(".md", "_question.md")
-    image_dir = f"Raw_Images_{session_id}"
+    
+    # output/ 기본 출력 폴더 생성
+    output_dir = "output"
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # 세션 폴더 생성: 중간 결과(Realtime_Log, question, Raw_Images)를 여기에 저장
+    session_dir = os.path.join(output_dir, session_id)
+    os.makedirs(session_dir, exist_ok=True)
+    
+    # Final_Summary 파일명을 미리 확정 (output/ 바로 아래, 세션 폴더 상위)
+    final_summary_file = os.path.join(output_dir, f"Final_Summary_{session_id}.md")
+    print_success(f"세션 폴더 생성: {os.path.abspath(session_dir)}/")
+    print_info(f"최종 요약 파일(예정): {os.path.abspath(final_summary_file)}")
+    
+    realtime_log_file = os.path.join(session_dir, f"Realtime_Log_{session_id}.md")
+    question_log_file = os.path.join(session_dir, f"Realtime_Log_{session_id}_question.md")
+    image_dir = os.path.join(session_dir, f"Raw_Images_{session_id}")
     os.makedirs(image_dir, exist_ok=True)
     
     with open(realtime_log_file, "w", encoding="utf-8") as f:

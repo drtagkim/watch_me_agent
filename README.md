@@ -1,4 +1,4 @@
-# 👁️ Watch Me Agent (v0.0.3)
+# 👁️ Watch Me Agent (v0.0.4)
 
 **Watch Me Agent**는 발표자의 웹캠 영상(Multi-frame GIF)과 실시간 오디오를 융합하여, **Gemini 3.1 Pro Preview**의 막강한 멀티모달 능력을 통해 발표 내용, 비언어적 맥락, 핵심 질문 사항 등을 리얼타임으로 심층 분석하는 AI 조교 시스템입니다. 
 
@@ -18,7 +18,7 @@
 코드나 패키지를 직접 설치하실 필요가 없습니다! 이 저장소의 주소를 복사하여 Antigravity(또는 호환되는 개발 에이전트 인터페이스)에게 전달해 보세요.
 
 **💡 복사 후 에이전트에게 이렇게 명령해 보세요:**
-> "이 레포지토리(https://github.com/drtagkim/watch_me_agent)를 가져와서 내 PC에 설치해 주고, 필요한 파이썬 패키지(OpenCV, sounddevice, google-genai, Pillow 등)를 알아서 세팅해 줘."
+> "이 레포지토리(https://github.com/drtagkim/watch_me_agent)를 가져와서 내 PC에 설치해 주고, 필요한 파이썬 패키지(OpenCV, sounddevice, google-genai, Pillow, PyYAML 등)를 알아서 세팅해 줘."
 
 ### 환경 변수 세팅 (필수 API Key)
 에이전트가 코드를 실행하기 전, 다음 환경변수가 등록되어 있어야 합니다. (보안상 저장소에는 포함되어 있지 않습니다)
@@ -56,7 +56,19 @@ python watch_and_analyze.py --chunk 10 --focus "투자 피칭"
 - **`[Ctrl + C]`** : 강제 인터럽트를 발생시켜 안전하게 프로세스를 중단시킵니다.
 > **💡 윤이나의 팁:** 위 단축키를 눌러 종료 신호를 보내면 그 즉시 강제로 꺼지는 것이 아닙니다. *현재까지 밀려있는 백그라운드 분석을 모두 끝마친 후*, 모인 데이터를 싹~ 긁어모아 **최종 요약본(Final Summary)**을 생성하고 안전하게 하드웨어를 반납한 뒤 우아하게 종료됩니다!
 
+## 📂 출력 폴더 구조
+모든 분석 결과물은 `output/` 폴더 아래에 세션 단위로 정리됩니다.
+```
+output/
+├── Final_Summary_2026-03-10_18-00-00.md       ← 최종 종합 분석 리포트
+└── 2026-03-10_18-00-00/                        ← 세션 폴더
+    ├── Realtime_Log_2026-03-10_18-00-00.md      ← 실시간 국면별 분석 로그
+    ├── Realtime_Log_..._question.md             ← 국면별 핵심 질문 모음
+    └── Raw_Images_.../                          ← 3초 간격 GIF 프레임
+```
+
 ## 🤝 버전 로그
+- **v0.0.4** (2026-03-10): `output/` 폴더 기반 출력 구조화 — 세션별 중간 결과(로그, 질문, GIF)를 세션 폴더에 정리하고 Final_Summary는 상위에 배치. `requirements.txt`에 `PyYAML` 의존성 추가. `watch_run.sh` YAML 파싱 시 주석 내 숫자가 섞이던 버그 수정.
 - **v0.0.3** (2026-03-10): `preferences.yaml` 설정 파일 도입으로 국면 분석 간격, 이미지 캡처 주기, 모델명, 해상도 등 전 설정값을 외부 파일에서 관리 가능. 실시간 EQ 막대 및 카메라 캡처 애니메이션(UX 시각 피드백) 탑재. 카메라/마이크 자원 회수 안정성 대폭 개선.
 - **v0.0.2** (2026-03-10): Antigravity UI 컴포넌트 이식 완료. CLI 텍스트/경시대회 출력의 전면 UI 개선 및 종료 단축키 가이드 보완.
 - **v0.0.1** (2026-03-10): 최초 멀티모달(Native Audio ↔ Video GIF) 로직 통합 릴리즈. Mlx-whisper 및 Qwen 제거 후 Gemini 3.1 단일 모델 구축 완료.
