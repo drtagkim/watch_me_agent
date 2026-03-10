@@ -55,7 +55,8 @@ def cleanup_hardware():
     global audio_stream, cap
     if audio_stream is not None:
         try:
-            audio_stream.abort() # Deadlock 및 CoreAudio Crash 방지 위해 stop 대신 abort 사용
+            audio_stream.stop()
+            time.sleep(0.1) # PortAudio 콜백이 자연스럽게 종료될 시간 벌기
             audio_stream.close()
         except Exception:
             pass
@@ -520,17 +521,21 @@ def main_loop(chunk_duration=10, focus_area=None):
         print()
         print_success("(종료 루틴 진입) 마이크와 카메라 자원 회수 중...")
         cleanup_hardware() 
-        print_info("진행 중인 백그라운드 분석 중인 데이터(Gemini API 병합)가 있다면 완료될 때까지 잠시 대기합니다...")
+        print_info("진행 중인 백그라운드 분석 데이터(Gemini API 병합)가 있다면 완료될 때까지 잠시 대기합니다...")
+        print_warning("👉 (만약 너무 오래 걸리면 Ctrl+C를 한 번 더 눌러 강제로 즉시 종료하세요)")
         
-        executor.shutdown(wait=True, cancel_futures=False)
-        
-        # 종료 전 임시 파일 한번 더 비우기
-        cleanup_temp_dir()
-        
-        # 최종 결과 종합
-        generate_global_summary(session_id)
-        print()
-        print_styled("👋 모든 과정이 완전히 종료되었습니다. 수고하셨습니다 교수님!", Color.GREEN, Color.BOLD)
+        try:
+            executor.shutdown(wait=True, cancel_futures=False)
+            # 최종 결과 종합
+            generate_global_summary(session_id)
+            # 종료 전 임시 파일 한번 더 비우기
+            cleanup_temp_dir()
+            print_styled("\n[완료] 윤이나의 관찰 및 분석이 모두 안전하게 종료되었습니다. 수고하셨습니다, 교수님!", Color.CYAN, Color.BOLD)
+        except KeyboardInterrupt:
+            print()
+            print_error("🚨 강제 종료 신호 재입력 감지! 즉시 모든 프로세스를 처형하고 시스템을 탈출합니다.")
+            import os
+            os._exit(1)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Watch Presentation CLI Tool (Yoon Ina)")
